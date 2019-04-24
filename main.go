@@ -6,6 +6,7 @@ import (
 	"os"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
+	"time"
 )
 
 // Credentials stores all of our access/consumer tokens
@@ -66,15 +67,12 @@ func main() {
 		log.Println(err)
 	}
 
-	// Print out the pointer to our client
-	// for now so it doesn't throw errors
-	fmt.Printf("%+v\n", client)
-
-	tweet, resp, err := client.Statuses.Update("A Test Tweet from a new Bot I'm building!", nil)
+	tweetText := "A Test Tweet from a new Bot I'm building!" + time.Now().Format(" Mon Jan 2 15:04:05")
+	tweet, resp, err := client.Statuses.Update(tweetText, nil)
 	if err != nil {
 		log.Println(err)
 	}
+
 	log.Printf("%+v\n", resp)
 	log.Printf("%+v\n", tweet)
-
 }
