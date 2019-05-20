@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/St0iK/go-quote-bot/dao"
 	"log"
 	"os"
 	"github.com/dghubble/go-twitter/twitter"
@@ -51,6 +52,12 @@ func getClient(creds *Credentials) (*twitter.Client, error) {
 }
 
 func main() {
+
+	dao.Connect()
+	e := dao.GetRandomQuote()
+
+	fmt.Printf("%+v\n", e)
+
 	fmt.Println("Go-Twitter Bot v0.01")
 	creds := Credentials{
 		AccessToken:       os.Getenv("ACCESS_TOKEN"),
@@ -67,7 +74,7 @@ func main() {
 		log.Println(err)
 	}
 
-	tweetText := "A Test Tweet from a new Bot I'm building!" + time.Now().Format(" Mon Jan 2 15:04:05")
+	tweetText := e.Author + " A Test Tweet from a new Bot I'm building!" + time.Now().Format(" Mon Jan 2 15:04:05")
 	tweet, resp, err := client.Statuses.Update(tweetText, nil)
 	if err != nil {
 		log.Println(err)
