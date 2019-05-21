@@ -2,10 +2,10 @@ package dao
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
-	//"os"
+
+	"os"
 	"time"
 
 	"github.com/St0iK/go-quote-parser/model"
@@ -27,7 +27,7 @@ func Connect() {
 	log.Println("Initialising MongoDB connection")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGO_DB_URL")))
 
 	if err != nil {
 		log.Fatal(err)
@@ -45,26 +45,19 @@ func Connect() {
 
 }
 
+// something
 func GetRandomQuote() model.Quote {
+
 	rand.Seed(time.Now().UnixNano())
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 
-	c, error := collection.CountDocuments(ctx, bson.D{}, nil)
-	fmt.Println("Getting info")
-	fmt.Println(c)
-	fmt.Println(error)
+	c, _ := collection.CountDocuments(ctx, bson.D{}, nil)
 
-
-	random:= rand.Int63n(c - 1) + 1
-	fmt.Println("random")
-	fmt.Println(random)
+	random := rand.Int63n(c-1) + 1
 
 	findOptions := options.Find()
 	findOptions.SetLimit(1)
 	findOptions.SetSkip(random)
-
-	// var results []*model.Quote
-
 
 	cur, err := collection.Find(ctx, bson.D{}, findOptions)
 	if err != nil {
@@ -80,16 +73,12 @@ func GetRandomQuote() model.Quote {
 		if err != nil {
 			log.Fatal(err)
 		}
-
 		return elem
-
 	}
 
 	if err := cur.Err(); err != nil {
 		log.Fatal(err)
 	}
 
-	return model.Quote{};
-
-
+	return model.Quote{}
 }
