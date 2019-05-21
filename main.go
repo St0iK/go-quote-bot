@@ -74,7 +74,7 @@ func main() {
 		log.Println(err)
 	}
 
-	tweetText := fmt.Sprintf("%s - %s", e.QuoteText, e.Author)
+	tweetText := fmt.Sprintf("%s - %s #quotes #quote #inspiration", e.QuoteText, e.Author)
 	tweet, resp, err := client.Statuses.Update(tweetText, nil)
 	if err != nil {
 		log.Println(err)
