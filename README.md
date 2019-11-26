@@ -1,3 +1,2 @@
 ### Go Quote Bot
 
-WIP
