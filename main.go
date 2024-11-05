@@ -10,76 +10,119 @@ import (
 	"github.com/dghubble/oauth1"
 )
 
-// Credentials stores all of our access/consumer tokens
-// and secret keys needed for authentication against
-// the twitter REST API.
-type Credentials struct {
+// Config holds the application configuration including Twitter credentials
+type Config struct {
+	TwitterCreds TwitterCredentials
+}
+
+// TwitterCredentials stores Twitter API authentication tokens
+type TwitterCredentials struct {
 	ConsumerKey       string
 	ConsumerSecret    string
 	AccessToken       string
 	AccessTokenSecret string
 }
 
-// getClient is a helper function that will return a twitter client
-// that we can subsequently use to send tweets, or to stream new tweets
-// this will take in a pointer to a Credential struct which will contain
-// everything needed to authenticate and return a pointer to a twitter Client
-// or an error
-func getClient(creds *Credentials) (*twitter.Client, error) {
-	// Pass in your consumer key (API Key) and your Consumer Secret (API Secret)
-	config := oauth1.NewConfig(creds.ConsumerKey, creds.ConsumerSecret)
-	// Pass in your Access Token and your Access Token Secret
-	token := oauth1.NewToken(creds.AccessToken, creds.AccessTokenSecret)
-
-	httpClient := config.Client(oauth1.NoContext, token)
-	client := twitter.NewClient(httpClient)
-
-	// Verify Credentials
-	verifyParams := &twitter.AccountVerifyParams{
-		SkipStatus:   twitter.Bool(true),
-		IncludeEmail: twitter.Bool(true),
-	}
-
-	// we can retrieve the user and verify if the credentials
-	// we have used successfully allow us to log in!
-	user, _, err := client.Accounts.VerifyCredentials(verifyParams)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Printf("User's ACCOUNT:\n%+v\n", user)
-	return client, nil
+// TwitterClient wraps the Twitter client and provides application-specific functionality
+type TwitterClient struct {
+	client *twitter.Client
 }
 
-func main() {
-
-	dao.Connect()
-	e := dao.GetRandomQuote()
-
-	fmt.Printf("%+v\n", e)
-
-	fmt.Println("Go-Twitter Bot v0.01")
-	creds := Credentials{
+// NewConfig creates a new Config instance from environment variables
+func NewConfig() (*Config, error) {
+	creds := TwitterCredentials{
 		AccessToken:       os.Getenv("ACCESS_TOKEN"),
 		AccessTokenSecret: os.Getenv("ACCESS_TOKEN_SECRET"),
 		ConsumerKey:       os.Getenv("CONSUMER_KEY"),
 		ConsumerSecret:    os.Getenv("CONSUMER_SECRET"),
 	}
 
-	fmt.Printf("%+v\n", creds)
-
-	client, err := getClient(&creds)
-	if err != nil {
-		log.Println("Error getting Twitter Client")
-		log.Println(err)
+	// Validate credentials
+	if creds.AccessToken == "" || creds.AccessTokenSecret == "" ||
+		creds.ConsumerKey == "" || creds.ConsumerSecret == "" {
+		return nil, fmt.Errorf("missing required Twitter credentials in environment variables")
 	}
 
-	tweetText := fmt.Sprintf("%s - %s #quotes #quote #inspiration", e.QuoteText, e.Author)
-	tweet, resp, err := client.Statuses.Update(tweetText, nil)
-	if err != nil {
-		log.Println(err)
+	return &Config{
+		TwitterCreds: creds,
+	}, nil
+}
+
+// NewTwitterClient creates and authenticates a new Twitter client
+func NewTwitterClient(creds TwitterCredentials) (*TwitterClient, error) {
+	config := oauth1.NewConfig(creds.ConsumerKey, creds.ConsumerSecret)
+	token := oauth1.NewToken(creds.AccessToken, creds.AccessTokenSecret)
+	httpClient := config.Client(oauth1.NoContext, token)
+	client := twitter.NewClient(httpClient)
+
+	// Verify credentials
+	verifyParams := &twitter.AccountVerifyParams{
+		SkipStatus:   twitter.Bool(true),
+		IncludeEmail: twitter.Bool(true),
 	}
 
-	log.Printf("%+v\n", resp)
-	log.Printf("%+v\n", tweet)
+	user, _, err := client.Accounts.VerifyCredentials(verifyParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify Twitter credentials: %w", err)
+	}
+
+	log.Printf("Authenticated as Twitter user: @%s", user.ScreenName)
+	return &TwitterClient{client: client}, nil
+}
+
+// PostQuote posts a quote to Twitter
+func (t *TwitterClient) PostQuote(quote *dao.Quote) error {
+	if quote == nil {
+		return fmt.Errorf("cannot post nil quote")
+	}
+
+	tweetText := formatTweet(quote)
+	tweet, _, err := t.client.Statuses.Update(tweetText, nil)
+	if err != nil {
+		return fmt.Errorf("failed to post tweet: %w", err)
+	}
+
+	log.Printf("Successfully posted tweet with ID: %d", tweet.ID)
+	return nil
+}
+
+// formatTweet creates a properly formatted tweet from a quote
+func formatTweet(quote *dao.Quote) string {
+	return fmt.Sprintf("%s - %s #quotes #quote #inspiration",
+		quote.QuoteText,
+		quote.Author)
+}
+
+func main() {
+	log.Println("Starting Twitter Quote Bot v0.02")
+
+	// Initialize configuration
+	config, err := NewConfig()
+	if err != nil {
+		log.Fatalf("Failed to initialize configuration: %v", err)
+	}
+
+	// Initialize database connection
+	if err := dao.Connect(); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// Get random quote
+	quote, err := dao.GetRandomQuote()
+	if err != nil {
+		log.Fatalf("Failed to get random quote: %v", err)
+	}
+
+	// Initialize Twitter client
+	client, err := NewTwitterClient(config.TwitterCreds)
+	if err != nil {
+		log.Fatalf("Failed to initialize Twitter client: %v", err)
+	}
+
+	// Post quote to Twitter
+	if err := client.PostQuote(quote); err != nil {
+		log.Fatalf("Failed to post quote: %v", err)
+	}
+
+	log.Println("Quote successfully posted to Twitter")
 }
