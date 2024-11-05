@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-
+	
 	"github.com/St0iK/go-quote-bot/dao"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
